@@ -9,13 +9,13 @@ import tkinter as tk
 from tkinter import Toplevel
 from tkinter import messagebox
 from tkinter import filedialog as fd
+# from tkinter import
 
 # importing custom python file called excel23 to import or export Excel files
 from excel23 import *
-# importing custom python file to carry out authentication
-from access23 import *
 
-# import excel23 as xl
+# importing custom python file to carry out authentication
+from access23 import Access23  # as Access
 
 
 # Class definition with various function and attributes
@@ -33,14 +33,8 @@ class BookStore:
         self.filename = ''
         self.headings = ''
 
-        # Boolean variable to check if the user creation was successful
-        # self.user_created = False
-
-        # Boolean variable to check if the credential check was passed
-        # self.check_pass = False
-
-        # Defining boolean variable to check if the database has been created or already exist.
-        self.database_created = False
+        # Defining boolean variable to check if the database and table has been created or already exist.
+        self.database_table_created = False
 
         # If the config file does not exist then create a config.txt file, create new user, create a database and table
         # and record the info in the config file.
@@ -49,39 +43,42 @@ class BookStore:
             # Creating an object of class Access23 and calling create_user function to create new user. If the user is
             # created, the create_user function returns True and the main menu window is displayed.
             access = Access23()
-            # self.user_created = access.create_user('./config.txt')
-
             access.create_user('./config.txt')
-            # if self.user_created:
-            print("Creating a new database")
-            print('Initializing the database table. Running program for the first time')
 
-            # Defining database window and database frame
-            self.db_window = tk.Tk()
-            self.db_window.title('Creating database')
-            self.db_window.geometry('300x200')
-            self.db_frame = tk.Frame(self.db_window, padx=10, pady=10)
+            # self.database_name = access.db_name
 
-            # calling the create_database function to start initial configuration
-            self.create_database()
-            self.db_window.mainloop()
+            with open('config.txt', 'r', encoding='utf-8') as file:
 
-            # else:
-            # messagebox.showinfo('Error Creating user', 'User was not created.')
+                for i, line in enumerate(file):
+                    if i == 0:
+                        self.database_name = line.replace('\n', '').split(': ')[1]
 
-        # If the config file exist, then extract information from it to check the user credentials inputted by the user
-        # and if it matches give access to the main menu window.
+            try:
+                self.db = sqlite3.connect(self.database_name)
+                self.cursor = self.db.cursor()
+
+                # Defining table window and frame
+                self.tb_window = tk.Tk()
+                self.tb_window.title('Creating Table')
+                self.tb_window.geometry('300x200')
+
+                # calling the create_table_details function to collect details of table to create it.
+                self.get_table_details()
+
+                self.tb_window.mainloop()
+
+            except Exception as e:
+                messagebox.showinfo('Database Error', f'{e}')
+
+        # If the config file exist, then extract information from database to check the user credentials inputted by
+        # the user and if it matches give access to the main menu window.
         else:
 
-            # Creating an object of class Access23 and calling check_user function to check credentials. If the check is
-            # passed then the program flow enters the main menu window.
-
+            # Calling the check_user function of class Access23 to check credentials against user inputs. If the check
+            # is passed then get the database name from the config file and connect to the database. If connection
+            # is successful program flow enters the main menu window.
             access = Access23()
-            # self.check_pass = access.check_user('config.txt')
             access.check_user('config.txt')
-
-            # if self.check_pass:
-            print("Using existing database")
 
             # Opening configuration files 'config.txt' to get the database and table name created during initial
             # configuration
@@ -89,35 +86,29 @@ class BookStore:
 
                 for i, line in enumerate(filehandle):
                     # Getting the database name from the first line
-                    if i == 1:
-                        self.database_name = line.replace('\n', '').split(':')[1]
+                    if i == 0:
+                        self.database_name = line.replace('\n', '').split(': ')[1]
 
                     # Getting the table name from the second line
-                    elif i == 2:
-                        self.table_name = line.replace('\n', '').split(':')[1]
+                    elif i == 1:
+                        self.table_name = line.replace('\n', '').split(': ')[1]
 
                     # Getting the table's fields' headings
-                    elif i == 3:
-                        temp_list = line.split(':')[1]
+                    elif i == 2:
+                        temp_list = line.split(': ')[1]
                         self.headings = temp_list.split(' ')
 
-            # trying Connecting to database
-            try:
-                self.db = sqlite3.connect(f'{self.database_name}')
+            if os.path.exists('./' + self.database_name):
+                self.db = sqlite3.connect('./' + self.database_name)
                 self.cursor = self.db.cursor()
+                self.database_table_created = True
 
-                # Saving any changes before the program exits
-                self.db.commit()
-
-                # if the database already exist or no error is generated set the boolean variable to True.
-                self.database_created = True
-
-            except Exception as e:
-                messagebox.showinfo('Error', f'{e}')
+                # query = f'SELECT * FROM {self.table_name}'
+                # self.cursor.execute('SELECT * FROM ')
 
         # Checking if the database and table already exist or has been created, then give access to the main menu window
 
-        if self.database_created:
+        if self.database_table_created:
             # Creating a root window
             self.root_window = tk.Tk()
             self.root_window.title("BookStore management system")
@@ -130,53 +121,49 @@ class BookStore:
             self.user_menu()
 
     # Function to start creating database
-    def create_database(self):
+    def get_table_details(self):
+
+        tb_frame = tk.Frame(self.tb_window, padx=10, pady=10)
 
         # Label and Entry widget definition to get user input
-        l_db_name = tk.Label(self.db_frame, text='Create Database Name')
-        l_db_name.grid(row=0, column=0, sticky=tk.E + tk.W)
+        l_table_name = tk.Label(tb_frame, text='Create Table Name')
+        l_table_name.grid(row=0, column=0, sticky=tk.E + tk.W)
 
-        e_db_name = tk.Entry(self.db_frame)
-        e_db_name.grid(row=0, column=1, sticky=tk.E + tk.W)
+        e_table_name = tk.Entry(tb_frame)
+        e_table_name.grid(row=0, column=1, sticky=tk.E + tk.W)
 
-        l_table_name = tk.Label(self.db_frame, text='Create Table Name')
-        l_table_name.grid(row=1, column=0, sticky=tk.E + tk.W)
+        l_total_field = tk.Label(tb_frame, text='Number of Table Fields')
+        l_total_field.grid(row=1, column=0, sticky=tk.E + tk.W)
 
-        e_table_name = tk.Entry(self.db_frame)
-        e_table_name.grid(row=1, column=1, sticky=tk.E + tk.W)
-
-        l_total_field = tk.Label(self.db_frame, text='Number of Table Fields')
-        l_total_field.grid(row=2, column=0, sticky=tk.E + tk.W)
-
-        e_total_field = tk.Entry(self.db_frame)
-        e_total_field.grid(row=2, column=1, sticky=tk.E + tk.W)
+        e_total_field = tk.Entry(tb_frame)
+        e_total_field.grid(row=1, column=1, sticky=tk.E + tk.W)
 
         # Button to continue getting details to make the database and table. When button is clicked, a get_fields method
         # is called where database name, table name and size of fields to be created is passed as an argument.
-        btn_next = tk.Button(self.db_frame, text='Next',
+        btn_next = tk.Button(tb_frame, text='Next',
                              command=lambda: self.get_fields(
-                                 int(e_total_field.get()), e_db_name.get(), e_table_name.get()))
+                                 int(e_total_field.get()), e_table_name.get()))
         btn_next.grid(row=3, column=0, sticky=tk.E + tk.W)
 
-        self.db_frame.pack(fill='both')
+        tb_frame.pack(fill='both')
 
     # Function to get fields for the table and create table
-    def get_fields(self, size, database_name, table_name):
+    def get_fields(self, size, table_name):  # database_name,
 
-        self.database_name = database_name
+        # self.database_name = database_name
         self.table_name = table_name
 
-        # Defining two dimension entry with 4 rows and 2 column. Each row receives field name and field type.
+        # Defining two dimension entry with 4 rows and 2 column. Each row receives table's field names and field types.
         en = [[tk.Entry for i in range(2)] for j in range(size)]
         # en = [[tk.Entry] * 2] * size
 
-        parent_window = self.db_window
+        parent_window = self.tb_window
 
-        # Creating a child window 'fields_window' whose parent window is 'db_window'
+        # Creating a child window 'fields_window' whose parent window is 'tb_window'
         fields_window = Toplevel(parent_window)
 
         # Setting window title and size
-        fields_window.title('Creating database')
+        fields_window.title('Creating table')
         fields_window.geometry('400x200')
 
         # Focusing the current window and disabling the parent window
@@ -193,7 +180,7 @@ class BookStore:
         # laying label and a pair of entry widgets in a grid
         for i in range(size):
             l_field = tk.Label(fields_frame, text=f'Enter field {i}')
-            l_field.grid(row=i + 1, column=0, sticky=tk.E + tk.W)
+            l_field.grid(row=i+1, column=0, sticky=tk.E + tk.W)
             for j in range(2):
 
                 en[i][j] = tk.Entry(fields_frame)
@@ -229,25 +216,21 @@ class BookStore:
                 str_headings_types += field + ', '
                 str_headings += field.split(' ')[0] + ' '
 
-        try:
-            self.db = sqlite3.connect(self.database_name)
-            self.cursor = self.db.cursor()
+        # creating a query with table name and the fields
+        query = f'CREATE TABLE IF NOT EXISTS {self.table_name}({str_headings_types})'
+        self.cursor.execute(query)
+        self.db.commit()
 
-            # creating a query with table name and the fields
-            query = f'CREATE TABLE IF NOT EXISTS {self.table_name}({str_headings_types})'
-            self.cursor.execute(query)
-            self.db.commit()
-            self.database_created = True
+        # self.db.close()
 
-            with open('config.txt', 'a+', encoding='utf-8') as filehandle:
-                filehandle.write('Database name :' + self.database_name + '\n' + 'Table Name :' + self.table_name + '\n'
-                                 'Heading :' + str_headings)
+        with open('config.txt', 'a+', encoding='utf-8') as filehandle:
+            filehandle.write('Table Name: ' + self.table_name + '\n' + 'Headings: ' + str_headings)
 
-        except Exception as e:
-            messagebox.showinfo('Database Error', f'{e}')
+        # Since the table creation was successful set table_created variable to True
+        self.database_table_created = True
 
         get_window.destroy()
-        self.db_window.destroy()
+        self.tb_window.destroy()
 
     # Function to confirm whether to close window or not
     def user_menu(self):
@@ -279,17 +262,20 @@ class BookStore:
         main_label = tk.Label(root_frame, text="Library Management System")
         main_label.grid(row=0, column=0, sticky=tk.E + tk.W)
 
+        sale_button = tk.Button(root_frame, text='Sale', command=self.sale_menu)
+        sale_button.grid(row=1, column=0, sticky=tk.E + tk.W)
+
         add_button = tk.Button(root_frame, text="Add Book", command=self.new_entry)
-        add_button.grid(row=1, column=0, sticky=tk.E + tk.W)
+        add_button.grid(row=2, column=0, sticky=tk.E + tk.W)
 
         book_update = tk.Button(root_frame, text="Update Book", command=lambda: self.update_book(0))
-        book_update.grid(row=2, column=0, sticky=tk.E + tk.W)
+        book_update.grid(row=3, column=0, sticky=tk.E + tk.W)
 
         book_delete = tk.Button(root_frame, text="Delete Book", command=self.delete_book)
-        book_delete.grid(row=3, column=0, sticky=tk.E + tk.W)
+        book_delete.grid(row=4, column=0, sticky=tk.E + tk.W)
 
         book_search = tk.Button(root_frame, text="Search Book", command=lambda: self.search_book(0))
-        book_search.grid(row=4, column=0, sticky=tk.E + tk.W)
+        book_search.grid(row=5, column=0, sticky=tk.E + tk.W)
 
         book_view = tk.Button(root_frame, text="View books", command=lambda: self.view_all())
         book_view.grid(row=5, column=0, sticky=tk.E + tk.W)
@@ -302,6 +288,7 @@ class BookStore:
 
     def confirm_close(self):
         if messagebox.askyesno(title="Quit", message="Confirm to close"):
+            self.db.commit()
             self.db.close()
             self.root_window.destroy()
 
@@ -313,14 +300,16 @@ class BookStore:
         # the database.
         if value == 'Export':
             self.filename = fd.askopenfilename(title='Open File', initialdir='./')
-            xl = Excel23()
-            xl.excel_to_sqlite(self.database_name, self.table_name, self.filename)
+            if self.filename is not None:
+                xl = Excel23()
+                xl.excel_to_sqlite(self.database_name, self.table_name, self.filename)
 
         # If the value is Import then write or import from database to a new Excel file created by the user.
         elif value == 'Import':
             self.filename = fd.asksaveasfilename(title='Save', initialdir='./')
-            xl = Excel23()
-            xl.sqlite_to_excel(self.database_name, self.table_name, self.filename, self.headings)
+            if self.filename is not None:
+                xl = Excel23()
+                xl.sqlite_to_excel(self.database_name, self.table_name, self.filename, self.headings)
 
     # Function to return to main window
     def return_back(self, get_current_window):
@@ -328,7 +317,44 @@ class BookStore:
         get_current_window.destroy()
         # return self
 
-# Function to display all the records from the table books using Entry widget.
+# Function to record the daily transaction of books sale
+    def sale_menu(self):
+
+        sale_window = Toplevel(self.root_window)
+        sale_window.grab_set()
+
+        sale_window.title('Sale')
+        sale_window.geometry('500x500')
+
+        # main_frame = tk.Frame(sale_window, padx=10, pady=10)
+
+        transaction_frame = tk.Frame(sale_window, padx=10, pady=10)
+
+        scrollbar_sale = tk.Scrollbar(transaction_frame, width=10)
+        scrollbar_sale.pack(side='right', fill='y', expand=1)
+
+        shop_list = tk.Listbox(transaction_frame, yscrollcommand=scrollbar_sale.set)
+
+        for i in range(30):
+            shop_list.insert('end', str(i))
+
+        shop_list.pack(side='left', fill='both', expand=1)
+
+        scrollbar_sale.config(command=shop_list.yview)
+
+        # l_total = tk.Label(transaction_frame, width=50, )
+        # l_total.pack(side='left', fill='both', expand=1)
+        #
+        # e_total = tk.Entry(transaction_frame, width=50,)
+        # e_total.pack(side='right', fill='both', expand=1)
+
+        transaction_frame.pack(fill='both', expand=1)
+
+       # calculator_frame
+
+        # right_frame = tk.Frame(sale_window, padx=10, pady=10)
+
+    # Function to display all the records from the table books using Entry widget.
     def view_all(self):
 
         self.cursor.execute(f'SELECT * FROM {self.table_name}')
